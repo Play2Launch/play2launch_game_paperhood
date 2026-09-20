@@ -1,6 +1,8 @@
 # PAPERHOOD · Paper Run
 
-独立的 TypeScript + Vite 跑酷原型，仅保留 Canvas 2D 纸艺版。当前仅为练习版，不替换 web 内置游戏，不提交分数，不请求账号信息。
+> 当前接入方式已统一为外部登记，见 [外部接入步骤](docs/external-integration.md)。下文旧内置规则说明中的 paper-run 游戏 ID / VITE_PAPERHOOD_GAME_URL 已停用；实际使用后台生成的 gx ID。
+
+独立的 TypeScript + Vite 跑酷游戏，仅保留 Canvas 2D 纸艺版。已接入独立 P2L SDK，支持同一构建的独立体验和平台 iframe 模式。新版 Web 和后端已支持 paper-run 规则的真实局次与合理性计分；旧活动不会自动迁移。游戏不接收账号凭证。
 
 ## 纯 2D 版本
 
@@ -14,7 +16,19 @@
 
 入口加 `?embed=1`（可继续追加 `&seed=42`）启用纯游戏布局：隐藏站点标题、Logo、页脚、路线编号和重复操作说明；游戏和底部操作按钮填满 iframe。保留 HUD、音效、暂停、开始/结算弹层和练习声明。父页面需给 iframe 明确宽高，例如 `width:100%;height:600px;border:0`。不带该参数仍是独立演示页面。
 
-`embed=1` 只切换布局，不包含平台认证、通信或成绩提交；这部分后续通过 Bridge 接入。
+`embed=1` 只切换布局；`mode=platform` 才启用平台局次协议。平台模式连接失败不会降级为独立体验。
+
+### SDK 与平台测试
+
+- 独立体验：直接打开入口，可加 `?embed=1`，分数只在本地展示。
+- 平台模式：`?mode=platform&embed=1&parent_origin=https%3A%2F%2Fadmin.example.com`，必须在授权父页面的 iframe 中运行。种子来自父页面，初始化后才能开始；结束通过 SDK 上报，等待结果，支持失败重试和新局。
+- 后台下载接入包后，将其中 `p2l-config.js` 放入本项目 `public/`，重新构建部署。该文件已忽略 Git；它包含游戏 ID 和公开客户端通信测试密钥，**不是计分凭据**。本游戏已从 npm 包导入 SDK，不要再加载 `p2l-bridge.js`，避免重复实例。
+- `VITE_P2L_PARENT_ORIGINS` 是构建时允许的父页面 origin 列表，用逗号分隔；示例见 `.env.example`。下载配置中的 `parent_origin` 也会加入白名单。URL 参数不能自行扩大白名单。
+- 后台“通信测试”验证随机挑战，“完整试玩测试”验证开局、进度、结束及模拟结果。规则版本填 `paper-run-practice-v5`，局长 90 秒。线上入口必须允许管理端 iframe 嵌入（CSP `frame-ancestors`），使用 HTTPS。
+- 正式 Web：新建草稿活动绑定 `paper-run` / `paper-run-practice-v5`，配置 Web 的 `VITE_PAPERHOOD_GAME_URL` 并将 Web origin 加到游戏白名单。无需通信密钥即可计分；若提供后台测试配置，只有对应管理端父页面使用其 gx 游戏 ID，正式 Web 仍使用 paper-run。最终成绩以服务端接受结果为准，强反作弊/回放尚未启用。
+- 本地启动 SDK 项目的 `npm run dev` 后，可打开 `http://127.0.0.1:5191/examples/host.html?game=paperhood`；同时保持本游戏在 5190 运行。
+
+SDK 固定构建包 `play2launch-game-sdk-0.1.0.tgz` 随仓库提交，保证 CI 的 `npm ci` 不依赖私有 Git SSH。更新时在 SDK 仓库执行 `npm run build`，再用 `npm pack --pack-destination ../PlayToLaunch_paperhood` 生成包并在本项目重新 `npm install ./play2launch-game-sdk-0.1.0.tgz`，同时提交包和 lockfile。
 
 Node.js 22；在此目录执行：
 
@@ -61,6 +75,6 @@ npm run build
 
 18 项测试中包含 30 个种子的全局无护盾、无拾取、无伤 90 秒通关操作样例，以及最高速度平台组合、高度边界、跨高度跳跃、非零高度掉落恢复检查；这证明所测种子有可行路线，不代表穷尽所有种子或真人难度已调平。
 
-当前规则版本 `paper-run-practice-v5`。随机种子由浏览器生成，成绩完全不可信；固定步长并不自动保证跨语言计算一致性。正式接入前需要服务端签发局次与种子、冻结规则、实现 Go 对应验分与跨语言回放样例。现有外部 H5 通信测试脚本仅验证通信，不能代替正式计分协议，因此这里没有伪装成已接入的分数消息。
+当前规则版本 `paper-run-practice-v5`。独立体验的种子由浏览器生成，平台模式采用宿主下发的种子；客户端成绩仍不可信。SDK 上报时长、分数、距离、收集数量、计分分项与输入记录，但并不证明其真实性。新版后端已实现局次签发、时长/分数合理性检查、幂等结算与持久化；Go 回放验分按当前计划暂缓。随机挑战仅验证 SDK 通信，不是防作弊机制。
 
 本项目不包含登录凭证、服务端密钥或钱包操作。无需 Unity 或额外编辑器。角色及场景使用纸艺图像素材与 Canvas 2D 渲染。
