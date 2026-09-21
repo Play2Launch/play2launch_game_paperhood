@@ -6,6 +6,17 @@
   -webkit-touch-callout: none;
 }
 #viewport, #jump { -webkit-user-drag: none; }
+/* Keep the action corridor compact on portrait phones; spare iframe space
+   stays outside the scene instead of stretching terrain and foliage apart. */
+main { container-type: inline-size; }
+.game { max-height: 85cqw; min-height: 0; }
+.overlay { overflow-y: auto; overscroll-behavior: contain; }
+@media (max-width: 650px) {
+  .panel { padding: 12px; }
+  .panel h2 { font-size: 30px; }
+  .panel > p:not(.eyebrow) { margin: 10px 0; line-height: 1.5; }
+  .primary, .secondary { padding: 10px 14px; }
+}
 html.embedded,
 .embedded body,
 .embedded #app { width: 100%; height: 100%; margin: 0; overflow: hidden; }
@@ -13,6 +24,7 @@ html.embedded,
   display: flex; flex-direction: column;
   width: 100%; height: 100%; max-width: none; min-height: 0;
   margin: 0; padding: 0;
+  justify-content: center;
 }
 .embedded header,
 .embedded .heading,

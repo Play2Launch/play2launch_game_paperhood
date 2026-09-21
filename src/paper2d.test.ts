@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { framing, Paper2D, platformPlants } from './paper2d';
 import { Run } from './simulation';
+import { platformDepth } from './paper-art';
 
 afterEach(() => vi.unstubAllGlobals());
 function renderer() {
@@ -15,6 +16,14 @@ function renderer() {
   return { art: new Paper2D(false), commands, canvas };
 }
 describe('2D presentation', () => {
+  it.each([[320, 640], [390, 844], [430, 932], [1256, 540]])('extends ground below portrait and landscape frames at %i × %i', (w, h) => {
+    const { scale, baseline } = framing(w, h);
+    for (const elevation of [-2, 0, 3]) {
+      const y = baseline - elevation * scale;
+      expect(y + platformDepth(y, scale, false, h) * .65).toBeGreaterThan(h);
+      expect(platformDepth(y, scale, true, h)).toBe(scale * 1.35);
+    }
+  });
   it('places stable flora away from ledges, hazards and collectibles', () => {
     const p = { x: -20, width: 100, y: 0 };
     const obstacles = [{ x: 14, y: 0, hit: false }];

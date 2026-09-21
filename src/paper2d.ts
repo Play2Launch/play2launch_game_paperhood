@@ -103,8 +103,8 @@ export class Paper2D {
         if (sx(plant.x) > -s * 4 && sx(plant.x) < w + s * 4)
           this.art.plant(c, sx(plant.x), y, s, plant.tree);
       }
-      if (this.art.platform(c, x, right, y, s, !!p.upper, w)) continue;
-      const bottom = p.upper ? y + s * .24 : y + s * 2.1;
+      if (this.art.platform(c, x, right, y, s, !!p.upper, w, h)) continue;
+      const bottom = p.upper ? y + s * .24 : Math.max(y + s * 2.1, h + 30);
       this.polygon([[x, y], [right, y], [right - 7, bottom - 8], [right - 25, bottom + 7], [x + 12, bottom], [x, bottom - 18]], '#293d2c', '#435a39');
       this.polygon([[x, y], [right, y], [right - 14, y + s * .22], [x + 10, y + s * .22]], '#729354');
       this.line([[x, y], [right, y]], p.upper ? '#e2e8b8' : '#c9ef88', 2);

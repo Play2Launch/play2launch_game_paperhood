@@ -13,6 +13,9 @@ export function scrollOffset(distance: number, scale: number, layer: keyof typeo
   return distance * scale * SCROLL_RATES[layer];
 }
 export function foregroundTop(height: number) { return height * .84; }
+export function platformDepth(y: number, scale: number, upper: boolean, viewportHeight: number) {
+  return upper ? scale * 1.35 : Math.max(scale * 5.7, (viewportHeight - y + scale) / .65);
+}
 export class PaperArt {
   readonly images: Partial<Record<ArtName, HTMLImageElement>> = {};
   readonly ready: Promise<boolean>;
@@ -129,9 +132,10 @@ export class PaperArt {
     }
     c.restore();
   }
-  platform(c: CanvasRenderingContext2D, x: number, right: number, y: number, s: number, upper: boolean, viewportWidth: number) {
+  platform(c: CanvasRenderingContext2D, x: number, right: number, y: number, s: number, upper: boolean, viewportWidth: number, viewportHeight = 0) {
     const img = this.images.rock ?? this.images.paper; if (!img) return false;
-    const depth = upper ? s * 1.35 : s * 5.7;
+    // Even the shortest polygon edge (.65 of depth) must reach below the frame.
+    const depth = platformDepth(y, s, upper, viewportHeight);
     c.save(); c.beginPath();
     c.moveTo(x, y); c.lineTo(right, y); c.lineTo(right, y + depth * .8);
     c.lineTo(right - Math.min(s * .65, (right - x) * .1), y + depth);
