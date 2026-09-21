@@ -28,6 +28,7 @@ jobs:
         run: npm run build
         env:
           VITE_API_MODE: live
+          VITE_P2L_PARENT_ORIGINS: https://www.play2launch.com,https://admin.play2launch.com
 
       - name: upload
         uses: moonpathbg/scp_uploader@latest
