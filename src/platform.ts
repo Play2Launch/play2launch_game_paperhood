@@ -6,7 +6,7 @@ export function runReport(run: Run, withInputs = true): Finish {
   const inputs = new Map(run.inputs.map(e => [e.tick, { ...e }]));
   return { elapsed_ms: Math.round(run.time * 1000), score: run.score,
     metrics: { distance: run.distance, collected: run.collected, pickup_score: run.pickupScore,
-      lives: Math.max(0, run.lives), won: run.won ? 1 : 0, distance_score: Math.floor(run.distance * 10), completion_bonus: run.won ? 2000 : 0 },
+      lives: Math.max(0, run.lives), won: run.won ? 1 : 0, distance_score: Math.floor(run.distance * 10), completion_bonus: run.finishCollected ? 2000 : 0, finish_collected: run.finishCollected ? 1 : 0 },
     ...(withInputs ? {inputs: [...inputs.values()].sort((a,b)=>a.tick-b.tick)} : {}) };
 }
 export function validDuration(duration: number) { return duration === DURATION * 1000; }

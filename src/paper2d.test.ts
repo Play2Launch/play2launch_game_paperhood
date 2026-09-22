@@ -16,6 +16,22 @@ function renderer() {
   return { art: new Paper2D(false), commands, canvas };
 }
 describe('2D presentation', () => {
+  it('shows actual multiplied pickup scores separately, expires them and clears on reset', () => {
+    const {art,commands}=renderer(); art.resize(390,330);
+    const run=new Run(42); run.course.items.length=0; run.course.obstacles.length=0;
+    run.combo=23;
+    run.course.items.push({x:.2,y:.8,value:200,taken:false},{x:.2,y:.8,value:2000,taken:false,finish:true});
+    run.step();
+    art.draw(run,0,false);
+    const labels=()=>commands.filter(c=>c[0]==='fillText').map(c=>c[1]);
+    expect(labels()).toContain('+600'); expect(labels()).toContain('+2000');
+    commands.length=0;
+    art.draw(run,2,true); expect(labels()).toContain('+600'); // Paused animations do not expire.
+    art.draw(run,2,false); commands.length=0;
+    art.draw(run,0,false); expect(labels()).not.toContain('+600');
+    art.reset(); commands.length=0; art.draw(new Run(42),0,false);
+    expect(labels()).not.toContain('+600'); expect(labels()).not.toContain('+2000');
+  });
   it.each([[320, 640], [390, 844], [430, 932], [1256, 540]])('extends ground below portrait and landscape frames at %i × %i', (w, h) => {
     const { scale, baseline } = framing(w, h);
     for (const elevation of [-2, 0, 3]) {

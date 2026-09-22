@@ -17,7 +17,7 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
 <header><a class="wordmark" href="#">P2L <span>/ PAPERHOOD</span></a><span class="tag">INDEPENDENT GAME · PRACTICE</span></header>
 <main><div class="heading"><div><p class="eyebrow">BUY HIGH. JUMP HIGHER.</p><h1>Outrun the <em>red.</em></h1></div><p class="intro">A paper-thin chance.<br>A diamond-handed finish.</p></div>
 <section class="game" aria-label="PAPERHOOD runner"><div id="viewport"></div>
-<div class="hud"><div><small>SCORE</small><strong id="score">00000</strong></div><div class="hud-center"><small id="phase">OPENING BELL</small><div class="progress"><i id="progress"></i></div></div><div class="right"><small id="clock">90s</small><strong id="lives" aria-label="3 lives">◆ ◆ ◆</strong></div><button id="pause" aria-label="Pause game" disabled>Ⅱ</button></div>
+<div class="hud"><div><small>SCORE</small><strong id="score">00000</strong><div class="combo-meter"><span id="combo-count">COMBO 0</span><b id="multiplier">×1</b></div><small id="combo-next">8 TO ×2</small></div><div class="hud-center"><small id="phase">OPENING BELL</small><div class="progress"><i id="progress"></i></div></div><div class="right"><small id="clock">90s</small><strong id="lives" aria-label="3 lives">◆ ◆ ◆</strong></div><button id="pause" aria-label="Pause game" disabled>Ⅱ</button></div>
 <div id="damage-flash" aria-hidden="true"></div><div id="callout" aria-live="polite"></div><div id="route-hint"></div><button id="sound" aria-label="Mute sound" aria-pressed="false">SOUND ON</button>
 <div class="status"><span id="combo">COLLECT · BUILD YOUR MULTIPLIER</span><span id="seed"></span></div>
 <div class="overlay" id="overlay"><div class="panel"><p class="eyebrow" id="panel-tag">PAPER RUN / 01</p><h2 id="panel-title">Small hands.<br>Big escape.</h2><p id="panel-copy">Jump the red spikes. Glide across the gaps.<br>Three lives. Ninety seconds. A new route every run.</p><button class="primary" id="start">LET’S RUN <span>↗</span></button><button class="secondary" id="replay" hidden>Replay this route</button><p class="fine">Practice only · No activity points or real rewards</p></div></div>
@@ -43,12 +43,17 @@ el('start').textContent = 'LOADING PAPER WORLD…';
 viewport.append(paper2d.canvas);
 let run = new Run(previewSeed), active = false, paused = false;
 let lastCollected = 0, lastLives = 3, lastShield = false, lastPhase = -1, feedback = 0, flash = 0;
+let lastFinishCollected = false;
+let shownCombo=0, shownComboBreaks=0;
 function announce(text: string) { el('callout').textContent = text; feedback = 2.3; }
 function start(s = currentSeed) {
   if (!sdk || platformBlocked) return;
   sdk.start();
   lastReportAt=-Infinity;
   audio.unlock(); lastCollected = 0; lastLives = 3; lastShield = false; lastPhase = -1; flash = 0;
+  lastFinishCollected = false;
+  shownCombo=0; shownComboBreaks=0;
+  el('combo-count').closest('.combo-meter')?.removeAttribute('data-broken');
   paper2d.reset();
   run = new Run(s); active = true; paused = false; accumulator = 0;
   el('overlay').hidden = true; el<HTMLButtonElement>('pause').disabled = !sdk.session?.allow_pause;
@@ -118,26 +123,41 @@ function frame(now: number) {
     if (sdk && now-lastReportAt>=5000) { sdk.progress(runReport(run,false));lastReportAt=now; }
     feedback = Math.max(0,feedback-delta); flash = Math.max(0,flash-delta);
     if (run.collected > lastCollected) { audio.play('coin'); lastCollected = run.collected; }
+    if (run.finishCollected && !lastFinishCollected) { lastFinishCollected = true; audio.play('coin'); announce('FINISH SEAL · +2,000'); }
     if (run.lives < lastLives) { audio.play('hurt'); flash = 0.35; lastLives = run.lives; if (!reducedMotion) navigator.vibrate?.(35); }
     if (run.shield > 0 && !lastShield) { audio.play('shield'); announce('DIAMOND HANDS · MAGNET + SHIELD'); }
     lastShield = run.shield > 0;
     const phase = run.time < 15 ? 0 : run.time < 40 ? 1 : run.time < 70 ? 2 : 3;
     if (phase !== lastPhase) { lastPhase = phase; announce(['OPENING BELL · FIND YOUR RHYTHM','BULL RUN · TAKE THE HIGH ROAD','VOLATILITY · WATCH YOUR LANDING','FINAL 20 SECONDS · HOLD YOUR NERVE'][phase]); audio.play('phase'); }
+    if(run.comboBreaks>shownComboBreaks) {
+      shownComboBreaks=run.comboBreaks;
+      announce(run.lastComboBreak==='miss'?'MISSED · COMBO BREAK':'HIT · COMBO BREAK');
+      el('combo-count').closest('.combo-meter')?.setAttribute('data-broken','true');
+    } else if(run.combo>shownCombo) {
+      el('combo-count').closest('.combo-meter')?.removeAttribute('data-broken');
+      if(!reducedMotion) el('combo-count').animate([{transform:'scale(1.3)'},{transform:'scale(1)'}],{duration:180});
+      if(Math.floor(run.combo/8)>Math.floor(shownCombo/8) && run.combo<=16) announce(`COMBO ${run.combo} · ×${run.multiplier} MULTIPLIER`);
+    }
+    shownCombo=run.combo;
   }
   el('callout').style.opacity = playing && feedback > 0 ? '1' : '0';
   el('damage-flash').style.opacity = String(reducedMotion ? 0 : flash);
   const nextSection = run.course.sections.find(s => s.end > x && s.x < x+22);
-  const hints = {jump:'SHORT JUMPS · LAND, THEN TAP AGAIN',glide:'GLIDE THE GAP · RELEASE BEFORE THE SPIKE',choice:'HIGH ROAD · DOUBLE NOTES / LOW ROAD · JUMP TO EXIT',tunnel:'JUMP → RELEASE UNDER ROOF → JUMP',rest:'BREATHER · RESET YOUR RHYTHM'};
+  const hints = {jump:'SHORT JUMPS · LAND, THEN TAP AGAIN',glide:'GLIDE THE GAP · RELEASE BEFORE THE SPIKE',choice:'HIGH ROAD · DOUBLE NOTES / LOW ROAD · JUMP TO EXIT',tunnel:'HOLD OVER BLOCK → RELEASE UNDER ROOF → JUMP',rest:'SMALL LANDINGS · RELEASE, LAND, JUMP AGAIN'};
   const nextFloor = run.course.platforms.find(p=>!p.upper && p.x>x && p.x-x<14);
   const terrainHint = nextFloor && Math.abs(nextFloor.y-run.terrainHeight)>0.1 ? (nextFloor.y>run.terrainHeight?'UPHILL · JUMP TO THE HIGHER LEDGE':'DOWNHILL · CONTROL YOUR LANDING') : '';
-  el('route-hint').textContent = active && nextSection ? terrainHint || hints[nextSection.kind] : '';
+  el('route-hint').textContent = active && nextSection ? terrainHint || (nextSection.kind==='tunnel' || (nextSection.kind==='rest' && nextSection.x>=551) ? hints[nextSection.kind] : nextSection.x >= 381 && nextSection.kind !== 'rest' ? 'WATCH THE RHYTHM · AMBER NOTES = RISKY ROUTE' : nextSection.kind==='rest'?'BREATHER · RESET YOUR RHYTHM':hints[nextSection.kind]) : '';
   el('score').textContent = run.score.toString().padStart(5,'0');
   el('clock').textContent = `${Math.max(0,Math.ceil(DURATION-run.time))}s`;
   el('lives').textContent = '◆ '.repeat(Math.max(0,run.lives))+'◇ '.repeat(3-Math.max(0,run.lives));
   el('lives').setAttribute('aria-label', `${run.lives} lives`);
   el('progress').style.width = `${run.time/DURATION*100}%`;
   el('phase').textContent = run.time < 15 ? 'OPENING BELL' : run.time < 40 ? 'BULL RUN' : run.time < 70 ? 'VOLATILE MARKET' : 'FINAL ESCAPE';
-  el('combo').textContent = run.shield > 0 ? `DIAMOND HANDS · ${run.shield.toFixed(1)}s` : `×${run.multiplier} · ${run.combo} STREAK · SHIELD ${run.collected % SHIELD_NOTES}/${SHIELD_NOTES}`;
+  el('combo-count').textContent = `COMBO ${run.combo}`;
+  el('multiplier').textContent = `×${run.multiplier}`;
+  el('multiplier').dataset.level = String(run.multiplier);
+  el('combo-next').textContent = run.multiplier === 3 ? 'MAX MULTIPLIER' : `${run.multiplier*8-run.combo} TO ×${run.multiplier+1}`;
+  el('combo').textContent = `NOTES 100 / 200 ×${run.multiplier} · ${run.shield > 0 ? `SHIELD ${run.shield.toFixed(1)}s` : 'MISS / HIT RESETS COMBO'}`;
   paper2d.draw(run, delta, !playing);
 }
 resize(); requestAnimationFrame(frame);

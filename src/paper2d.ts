@@ -1,4 +1,5 @@
 import type { Run, Platform, Obstacle, Item } from './simulation';
+import { obstaclePosition } from './simulation';
 import { PaperArt } from './paper-art';
 
 // Presentation only: coordinates remain in simulation units; never consume its RNG.
@@ -30,6 +31,8 @@ export class Paper2D {
   private spread = 0;
   private lastNotes = 0;
   private lastLives = 3;
+  private shownPickups = new WeakSet<Item>();
+  private scorePopups: { score: number; life: number; finish: boolean }[] = [];
   private particles: { x: number; y: number; vx: number; vy: number; life: number; hurt: boolean }[] = [];
   constructor(private reducedMotion: boolean) {
     const ctx = this.canvas.getContext('2d');
@@ -46,6 +49,7 @@ export class Paper2D {
   }
   reset() {
     this.ground = 0; this.spread = 0; this.lastNotes = 0; this.lastLives = 3; this.particles = [];
+    this.shownPickups = new WeakSet<Item>(); this.scorePopups = [];
   }
   private polygon(points: number[][], fill: string, stroke?: string) {
     const c = this.ctx; c.beginPath();
@@ -117,8 +121,37 @@ export class Paper2D {
       }
     }
     for (const o of run.course.obstacles) {
-      const x = sx(o.x), y = sy(o.y);
+      const pos = obstaclePosition(o, run.time);
+      const x = sx(pos.x), y = sy(pos.y);
       if (o.hit || x < -40 || x > w + 40) continue;
+      if (o.height) {
+        const half=(o.halfWidth ?? .65)*s, height=o.height*s;
+        // Cut three teeth into the existing silhouette, never above its original top.
+        this.polygon([[x-half,y],[x-half,y-height*.62],[x-half*.68,y-height*.91],[x-half*.34,y-height*.62],[x,y-height],[x+half*.34,y-height*.62],[x+half*.68,y-height*.91],[x+half,y-height*.62],[x+half,y]],'#a34435','#ffc18a');
+        for (const [tip, peak, right] of [[x-half*.68,y-height*.91,x-half*.34],[x,y-height,x+half*.34],[x+half*.68,y-height*.91,x+half]]) {
+          this.polygon([[tip,peak],[right,y-height*.62],[tip,y-height*.48]],'#753329');
+          this.line([[tip,peak],[tip,y-height*.48]],'#ed8c63',1);
+        }
+        this.line([[x-half,y-height*.45],[x,y-height*.32],[x+half,y-height*.45]],'#ed8c63',2);
+        c.save(); c.fillStyle='#ffe3a8'; c.font=`bold ${Math.max(10,s*.35)}px sans-serif`; c.textAlign='center'; c.fillText('HOLD',x,y-height-s*.3); c.restore();
+        continue;
+      }
+      if (o.motion) {
+        const { axis, amplitude } = o.motion;
+        const railY = o.y - (axis === 'x' ? .12 : 0);
+        const start = [sx(o.x - (axis === 'x' ? amplitude + .72 : 0)), sy(railY - (axis === 'y' ? amplitude : 0))];
+        const end = [sx(o.x + (axis === 'x' ? amplitude + .72 : 0)), sy(railY + (axis === 'y' ? amplitude : 0))];
+        this.line([start, end], '#f3b47899', 2);
+        for (const [tx, ty] of [start, end]) { c.fillStyle = '#f3b478'; c.fillRect(tx-2,ty-2,4,4); }
+        if (axis === 'x') {
+          // The carriage extends below the existing spike base; collision height stays unchanged.
+          c.fillStyle = '#873e32'; c.fillRect(x-s*.7,y,s*1.4,s*.25);
+          this.line([[x-s*.7,y],[x+s*.7,y]], '#ffc18a', 2);
+          this.line([[x-s*.5,y+s*.22],[x+s*.5,y+s*.22]], '#452a25', 2);
+          c.save(); c.beginPath(); c.rect(x-s*.7,y,s*1.4,s*.25); c.clip();
+          this.art.grain(c,x-s*.7,y,s*1.4,s*.25); c.restore();
+        }
+      }
       if (this.art.hazard(c, x, y, s, !!o.ceiling)) continue;
       if (o.ceiling) {
         c.fillStyle = '#b34a41'; c.fillRect(x - 1.1 * s, y - .65 * s, 2.2 * s, .65 * s);
@@ -136,7 +169,20 @@ export class Paper2D {
     for (const item of run.course.items) {
       const x = sx(item.x), y = sy(item.y);
       if (item.taken || x < -25 || x > w + 25) continue;
+      if (item.finish) {
+        c.save(); c.translate(x, y);
+        c.shadowColor = '#ffe39a'; c.shadowBlur = 18;
+        this.polygon([[0,-s*.95],[s*.65,0],[0,s*.95],[-s*.65,0]], '#f3d68b', '#fff5c9');
+        c.shadowBlur = 0;
+        this.polygon([[0,-s*.65],[s*.4,0],[0,s*.65],[-s*.4,0]], '#8a713a', '#fff5c9');
+        c.fillStyle = '#fff5c9'; c.textAlign = 'center'; c.font = `bold ${Math.max(10,s*.38)}px sans-serif`;
+        c.fillText('FINISH +2000', 0, -s*1.25);
+        c.restore(); continue;
+      }
       c.save(); c.translate(x, y); c.rotate(-.22 + Math.sin(time * 2 + item.x) * .08);
+      if (item.risky) {
+        this.line([[0,-s*.65],[s*.48,0],[0,s*.65],[-s*.48,0],[0,-s*.65]], '#ffbc74', 1.5);
+      }
       const gold = item.value === 200;
       c.shadowColor = gold ? '#ffdda5' : '#cfff6b'; c.shadowBlur = 9;
       c.fillStyle = gold ? '#f0d8a5' : '#c0e975'; c.fillRect(-s * .24, -s * .325, s * .48, s * .65);
@@ -163,6 +209,26 @@ export class Paper2D {
     const shade = c.createLinearGradient(0, h * .83, 0, h); shade.addColorStop(0, '#0b120d00'); shade.addColorStop(1, '#0b120ddd');
     c.fillStyle = shade; c.fillRect(0, h * .83, w, h * .17);
     this.art.foreground(c, w, h, this.reducedMotion ? 0 : run.x, s, time);
+    for (const item of run.course.items) {
+      if (!item.taken || !item.awardedScore || this.shownPickups.has(item)) continue;
+      this.shownPickups.add(item);
+      this.scorePopups.push({score:item.awardedScore,life:1.1,finish:!!item.finish});
+    }
+    this.scorePopups = this.scorePopups.slice(-8);
+    for (const [i, popup] of this.scorePopups.entries()) {
+      if (!frozen) popup.life -= delta;
+      const age = 1.1-popup.life;
+      const fontSize = Math.max(16, Math.min(26, s*.65));
+      const lift = this.reducedMotion ? 0 : age*30;
+      const y = Math.max(fontSize, sy(run.y+2.3)-lift-(this.scorePopups.length-1-i)*(fontSize+3));
+      c.save(); c.globalAlpha = Math.max(0,Math.min(1,popup.life/.35));
+      c.font = `bold ${popup.finish ? fontSize+3 : fontSize}px sans-serif`;
+      c.textAlign='center'; c.lineWidth=3; c.strokeStyle='#0a140c';
+      c.fillStyle=popup.finish ? '#ffe29a' : '#d8ff90';
+      const label=`+${popup.score}`;
+      c.strokeText(label,anchor,y); c.fillText(label,anchor,y); c.restore();
+    }
+    this.scorePopups = this.scorePopups.filter(p=>p.life>0);
   }
   private mage(x: number, y: number, scale: number, time: number, shield: boolean) {
     const c = this.ctx, open = this.spread, wave = Math.sin(time * 9) * .045;
