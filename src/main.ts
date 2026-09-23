@@ -146,7 +146,7 @@ function frame(now: number) {
   const hints = {jump:'SHORT JUMPS · LAND, THEN TAP AGAIN',glide:'GLIDE THE GAP · RELEASE BEFORE THE SPIKE',choice:'HIGH ROAD · DOUBLE NOTES / LOW ROAD · JUMP TO EXIT',tunnel:'HOLD OVER BLOCK → RELEASE UNDER ROOF → JUMP',rest:'SMALL LANDINGS · RELEASE, LAND, JUMP AGAIN'};
   const nextFloor = run.course.platforms.find(p=>!p.upper && p.x>x && p.x-x<14);
   const terrainHint = nextFloor && Math.abs(nextFloor.y-run.terrainHeight)>0.1 ? (nextFloor.y>run.terrainHeight?'UPHILL · JUMP TO THE HIGHER LEDGE':'DOWNHILL · CONTROL YOUR LANDING') : '';
-  el('route-hint').textContent = active && nextSection ? terrainHint || (nextSection.kind==='tunnel' || (nextSection.kind==='rest' && nextSection.x>=551) ? hints[nextSection.kind] : nextSection.x >= 381 && nextSection.kind !== 'rest' ? 'WATCH THE RHYTHM · AMBER NOTES = RISKY ROUTE' : nextSection.kind==='rest'?'BREATHER · RESET YOUR RHYTHM':hints[nextSection.kind]) : '';
+  el('route-hint').textContent = active && nextSection ? terrainHint || (nextSection.kind==='tunnel' || (nextSection.kind==='rest' && nextSection.x>=551) ? hints[nextSection.kind] : nextSection.x >= 381 && nextSection.kind !== 'rest' ? 'WATCH THE RHYTHM · HIGH NOTES = RISKY ROUTE' : nextSection.kind==='rest'?'BREATHER · RESET YOUR RHYTHM':hints[nextSection.kind]) : '';
   el('score').textContent = run.score.toString().padStart(5,'0');
   el('clock').textContent = `${Math.max(0,Math.ceil(DURATION-run.time))}s`;
   el('lives').textContent = '◆ '.repeat(Math.max(0,run.lives))+'◇ '.repeat(3-Math.max(0,run.lives));

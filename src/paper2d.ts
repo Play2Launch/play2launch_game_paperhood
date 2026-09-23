@@ -180,9 +180,6 @@ export class Paper2D {
         c.restore(); continue;
       }
       c.save(); c.translate(x, y); c.rotate(-.22 + Math.sin(time * 2 + item.x) * .08);
-      if (item.risky) {
-        this.line([[0,-s*.65],[s*.48,0],[0,s*.65],[-s*.48,0],[0,-s*.65]], '#ffbc74', 1.5);
-      }
       const gold = item.value === 200;
       c.shadowColor = gold ? '#ffdda5' : '#cfff6b'; c.shadowBlur = 9;
       c.fillStyle = gold ? '#f0d8a5' : '#c0e975'; c.fillRect(-s * .24, -s * .325, s * .48, s * .65);

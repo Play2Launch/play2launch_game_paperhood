@@ -153,6 +153,19 @@ describe('seeded course', () => {
   });
 });
 describe('practice simulation', () => {
+  it('collects a low note between lifting roofs without jumping or losing a life', () => {
+    for(let phase=0;phase<Math.PI*2;phase+=.4) {
+      const r=new Run(42); r.tick=3600; r.x=11;
+      r.course.platforms.splice(0,r.course.platforms.length,{x:0,width:40,y:0});
+      r.course.obstacles.splice(0,r.course.obstacles.length,
+        {x:13,y:2.65,ceiling:true,hit:false,motion:{axis:'y',amplitude:.7,period:3,phase}},
+        {x:18,y:2.65,ceiling:true,hit:false,motion:{axis:'y',amplitude:.7,period:2.8,phase:phase+1}});
+      r.course.items.splice(0,r.course.items.length,{x:16,y:.9,value:100,taken:false});
+      while(r.x<20) r.step();
+      expect(r.course.items[0].taken).toBe(true);
+      expect(r.lives).toBe(3); expect(r.pickupScore).toBe(100);
+    }
+  });
   it('breaks combo once on a missed note without damage, then restarts at one', () => {
     const r=new Run(1); r.course.items.length=0; r.course.obstacles.length=0;
     r.combo=16; r.shield=5;
