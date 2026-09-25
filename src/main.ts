@@ -16,7 +16,8 @@ const previewSeed = routeSeed !== null && /^\d{1,10}$/.test(routeSeed) && Number
 document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
 <header><a class="wordmark" href="#">P2L <span>/ PAPERHOOD</span></a><span class="tag">INDEPENDENT GAME · PRACTICE</span></header>
 <main><div class="heading"><div><p class="eyebrow">BUY HIGH. JUMP HIGHER.</p><h1>Outrun the <em>red.</em></h1></div><p class="intro">A paper-thin chance.<br>A diamond-handed finish.</p></div>
-<section class="game" aria-label="PAPERHOOD runner"><div id="viewport"></div>
+<section class="game art-loading" aria-label="PAPERHOOD runner" aria-busy="true"><div id="viewport"></div>
+<div id="art-loader" class="art-loader"><div><p class="eyebrow">PAPERHOOD / PAPER RUN</p><h2>Folding your world.</h2><p>Preparing the scenery for your escape.</p><progress id="art-progress" aria-label="Game artwork loading" value="0" max="12"></progress><p id="art-progress-copy" role="status">Loading artwork · 0%</p></div></div>
 <div class="hud"><div><small>SCORE</small><strong id="score">00000</strong><div class="combo-meter"><span id="combo-count">COMBO 0</span><b id="multiplier">×1</b></div><small id="combo-next">8 TO ×2</small></div><div class="hud-center"><small id="phase">OPENING BELL</small><div class="progress"><i id="progress"></i></div></div><div class="right"><small id="clock">90s</small><strong id="lives" aria-label="3 lives">◆ ◆ ◆</strong></div><button id="pause" aria-label="Pause game" disabled>Ⅱ</button></div>
 <div id="damage-flash" aria-hidden="true"></div><div id="callout" aria-live="polite"></div><div id="route-hint"></div><button id="sound" aria-label="Mute sound" aria-pressed="false">SOUND ON</button>
 <div class="status"><span id="combo">COLLECT · BUILD YOUR MULTIPLIER</span><span id="seed"></span></div>
@@ -38,6 +39,17 @@ const audio = new AudioCues();
 el('sound').onclick = () => { audio.unlock(); audio.muted = !audio.muted; el('sound').textContent = audio.muted ? 'SOUND OFF' : 'SOUND ON'; el('sound').setAttribute('aria-pressed', String(audio.muted)); el('sound').setAttribute('aria-label', audio.muted ? 'Unmute sound' : 'Mute sound'); };
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const paper2d = new Paper2D(reducedMotion);
+let artworkReady = false;
+const artworkReadyPromise = paper2d.art.ready.then(complete => {
+  artworkReady = true;
+  // Paint the final loaded (or fallback) scene before removing the cover.
+  paper2d.draw(run, 0, true);
+  el('art-loader').hidden = true;
+  document.querySelector('.game')!.classList.remove('art-loading');
+  document.querySelector('.game')!.setAttribute('aria-busy', 'false');
+  if (!platformBlocked) el('start').textContent = 'CONNECTING…';
+  return complete;
+});
 el<HTMLButtonElement>('start').disabled = true;
 el('start').textContent = 'LOADING PAPER WORLD…';
 viewport.append(paper2d.canvas);
@@ -158,10 +170,16 @@ function frame(now: number) {
   el('multiplier').dataset.level = String(run.multiplier);
   el('combo-next').textContent = run.multiplier === 3 ? 'MAX MULTIPLIER' : `${run.multiplier*8-run.combo} TO ×${run.multiplier+1}`;
   el('combo').textContent = `NOTES 100 / 200 ×${run.multiplier} · ${run.shield > 0 ? `SHIELD ${run.shield.toFixed(1)}s` : 'MISS / HIT RESETS COMBO'}`;
-  paper2d.draw(run, delta, !playing);
+  if (artworkReady) paper2d.draw(run, delta, !playing);
+  else {
+    el<HTMLProgressElement>('art-progress').max = paper2d.art.total;
+    el<HTMLProgressElement>('art-progress').value = paper2d.art.settled;
+    const progressText = `Loading artwork · ${Math.floor(paper2d.art.settled / paper2d.art.total * 100)}%`;
+    if (el('art-progress-copy').textContent !== progressText) el('art-progress-copy').textContent = progressText;
+  }
 }
 resize(); requestAnimationFrame(frame);
-void Promise.all([connectSDK(), paper2d.art.ready]).then(([connected, complete])=>{
+void Promise.all([connectSDK(), artworkReadyPromise]).then(([connected, complete])=>{
   sdk=connected;
   sdk.on('init', session=>{
     if(!validDuration(session.duration_ms)){

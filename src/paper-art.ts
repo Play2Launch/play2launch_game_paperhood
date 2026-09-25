@@ -19,19 +19,28 @@ export function platformDepth(y: number, scale: number, upper: boolean, viewport
 export class PaperArt {
   readonly images: Partial<Record<ArtName, HTMLImageElement>> = {};
   readonly ready: Promise<boolean>;
+  readonly total = Object.keys(ART_FILES).length;
+  settled = 0;
+  loaded = 0;
   constructor() {
     this.ready = Promise.all((Object.keys(ART_FILES) as ArtName[]).map(name => new Promise<boolean>(resolve => {
-      if (typeof Image === 'undefined') { resolve(false); return; }
+      if (typeof Image === 'undefined') { this.settled++; resolve(false); return; }
       const img = new Image();
       let settled = false;
       const finish = (ok: boolean) => {
         if (settled) return; settled = true; clearTimeout(timer);
         img.onload = null; img.onerror = null;
-        if (ok) this.images[name] = img;
+        if (ok) { this.images[name] = img; this.loaded++; }
+        this.settled++;
         resolve(ok);
       };
       const timer = setTimeout(() => finish(false), 12000);
-      img.onload = () => finish(img.naturalWidth > 0);
+      img.onload = () => {
+        if (!img.naturalWidth) { finish(false); return; }
+        // Decode before revealing the scene, not on its first visible frame.
+        if (typeof img.decode === 'function') void img.decode().then(() => finish(true), () => finish(false));
+        else finish(true);
+      };
       img.onerror = () => finish(false);
       img.src = `${import.meta.env.BASE_URL}art/${ART_FILES[name]}`;
     }))).then(results => results.every(Boolean));
