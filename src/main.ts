@@ -32,6 +32,13 @@ let nextDemoSeed: number | undefined = routeSeed !== null ? previewSeed : undefi
 let currentSeed = previewSeed;
 let autoStart = false;
 let lastReportAt = -Infinity;
+let trialRunID = '', trialEffective = false;
+function trialEvent(type:'trial_start'|'trial_effective') {
+  const origin=params.get('parent_origin');
+  if (!embedded || platformMode || !sdk || !origin || window.parent===window || !trialRunID) return;
+  // connectSDK has already checked the requested parent origin against the deployment allowlist.
+  window.parent.postMessage({protocol:'p2l-invite-analytics-v1',type,run_id:trialRunID},origin);
+}
 if (embedded) {
   el('panel-copy').innerHTML = 'Tap or press Space to jump.<br>Hold to glide · Release to land.';
 }
@@ -68,6 +75,8 @@ function start(s = currentSeed) {
   el('combo-count').closest('.combo-meter')?.removeAttribute('data-broken');
   paper2d.reset();
   run = new Run(s); active = true; paused = false; accumulator = 0;
+  trialRunID=Array.from(crypto.getRandomValues(new Uint8Array(16)),b=>b.toString(16).padStart(2,'0')).join('');trialEffective=false;
+  trialEvent('trial_start');
   el('overlay').hidden = true; el<HTMLButtonElement>('pause').disabled = !sdk.session?.allow_pause;
   el('pause').textContent = 'Ⅱ'; el('seed').textContent = `ROUTE ${s.toString(16).toUpperCase()}`;
   el('jump').focus({preventScroll:true});
@@ -132,6 +141,7 @@ function frame(now: number) {
   const x = run.x;
   const playing = active && !paused;
   if (playing) {
+    if (!trialEffective && run.time>=15) {trialEffective=true;trialEvent('trial_effective');}
     if (sdk && now-lastReportAt>=5000) { sdk.progress(runReport(run,false));lastReportAt=now; }
     feedback = Math.max(0,feedback-delta); flash = Math.max(0,flash-delta);
     if (run.collected > lastCollected) { audio.play('coin'); lastCollected = run.collected; }
