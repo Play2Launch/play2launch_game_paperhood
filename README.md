@@ -25,10 +25,10 @@
 - 后台下载接入包后，将其中 `p2l-config.js` 放入本项目 `public/`，重新构建部署。该文件已忽略 Git；它包含游戏 ID 和公开客户端通信测试密钥，**不是计分凭据**。本游戏已从 npm 包导入 SDK，不要再加载 `p2l-bridge.js`，避免重复实例。
 - `VITE_P2L_PARENT_ORIGINS` 是构建时允许的父页面 origin 列表，用逗号分隔；示例见 `.env.example`。下载配置中的 `parent_origin` 也会加入白名单。URL 参数不能自行扩大白名单。
 - 后台“通信测试”验证随机挑战，“完整试玩测试”验证开局、进度、结束及模拟结果。规则版本填 `paper-run-practice-v5`，局长 90 秒。线上入口必须允许管理端 iframe 嵌入（CSP `frame-ancestors`），使用 HTTPS。
-- 正式 Web：新建草稿活动绑定 `paper-run` / `paper-run-practice-v5`，配置 Web 的 `VITE_PAPERHOOD_GAME_URL` 并将 Web origin 加到游戏白名单。无需通信密钥即可计分；若提供后台测试配置，只有对应管理端父页面使用其 gx 游戏 ID，正式 Web 仍使用 paper-run。最终成绩以服务端接受结果为准，强反作弊/回放尚未启用。
+- 正式 Web：新建草稿活动绑定 `paper-run` / `paper-run-practice-v5`，配置 Web 的 `VITE_PAPERHOOD_GAME_URL` 并将 Web origin 加到游戏白名单。无需通信密钥即可计分；若提供后台测试配置，只有对应管理端父页面使用其 gx 游戏 ID，正式 Web 仍使用 paper-run。最终成绩以服务端接受结果为准，服务端现在按保存的种子和完整 inputs 回放校验。
 - 本地启动 SDK 项目的 `npm run dev` 后，可打开 `http://127.0.0.1:5191/examples/host.html?game=paperhood`；同时保持本游戏在 5190 运行。
 
-SDK 固定构建包 `play2launch-game-sdk-0.1.0.tgz` 随仓库提交，保证 CI 的 `npm ci` 不依赖私有 Git SSH。更新时在 SDK 仓库执行 `npm run build`，再用 `npm pack --pack-destination ../PlayToLaunch_paperhood` 生成包并在本项目重新 `npm install ./play2launch-game-sdk-0.1.0.tgz`，同时提交包和 lockfile。
+SDK 固定构建包 `play2launch-game-sdk-0.1.1.tgz` 随仓库提交，保证 CI 的 `npm ci` 不依赖私有 Git SSH。本次同帧输入修复的 SDK 源码保存在 `vendor/game-sdk`；更新时在该目录执行 `npm run build`，再用 `npm pack --pack-destination ../..` 生成包并在本项目重新 `npm install ./play2launch-game-sdk-0.1.1.tgz`，同时提交包和 lockfile。
 
 Node.js 22；在此目录执行：
 

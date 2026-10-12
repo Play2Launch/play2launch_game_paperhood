@@ -2,12 +2,12 @@ import { createGameSDK, type GameSDK, type TestConfig, type Finish } from '@play
 import { Run, DURATION, RULES } from './simulation';
 declare global { interface Window { P2L_TEST_CONFIG?: TestConfig; } }
 export function runReport(run: Run, withInputs = true): Finish {
-  // Normalize same-tick transitions to their final held state; keep the original Run log untouched.
-  const inputs = new Map(run.inputs.map(e => [e.tick, { ...e }]));
+  // Every edge matters: a press/release in one tick can queue a jump.
+  const inputs = run.inputs.map(e => ({ ...e }));
   return { elapsed_ms: Math.round(run.time * 1000), score: run.score,
     metrics: { distance: run.distance, collected: run.collected, pickup_score: run.pickupScore,
       lives: Math.max(0, run.lives), won: run.won ? 1 : 0, distance_score: Math.floor(run.distance * 10), completion_bonus: run.finishCollected ? 2000 : 0, finish_collected: run.finishCollected ? 1 : 0 },
-    ...(withInputs ? {inputs: [...inputs.values()].sort((a,b)=>a.tick-b.tick)} : {}) };
+    ...(withInputs ? {inputs} : {}) };
 }
 export function validDuration(duration: number) { return duration === DURATION * 1000; }
 export async function connectSDK(): Promise<GameSDK> {
